@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <!-- Orange background circle -->
+  <rect width="32" height="32" rx="8" fill="#F97316"/>
+  <!-- Ticket icon (white) -->
+  <path d="M6 11.5C6 10.67 6.67 10 7.5 10h17c.83 0 1.5.67 1.5 1.5v2a2 2 0 0 1 0 4v2c0 .83-.67 1.5-1.5 1.5h-17A1.5 1.5 0 0 1 6 19.5v-2a2 2 0 0 1 0-4v-2Z" fill="white" opacity="0.95"/>
+  <!-- Dashed center line -->
+  <line x1="14" y1="10" x2="14" y2="22" stroke="#F97316" stroke-width="1.5" stroke-dasharray="2 2"/>
+</svg>

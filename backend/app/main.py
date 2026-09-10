@@ -54,9 +54,13 @@ except Exception as _exc:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Lifespan runs on traditional servers (uvicorn). init_db() is idempotent
-    # so calling it twice is safe.
-    init_db()
-    print("[OK] Lifespan startup complete.")
+    # so calling it twice is safe. Wrapped in try/except so a DB error here
+    # does not crash the ASGI app and block all requests.
+    try:
+        init_db()
+        print("[OK] Lifespan startup complete.")
+    except Exception as e:
+        print(f"[WARN] Lifespan DB init failed: {e}")
     yield
     # Shutdown: SQLAlchemy connection pool is cleaned up automatically
 

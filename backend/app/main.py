@@ -29,17 +29,34 @@ def seed_demo_users(db):
             print(f"  [OK] Seeded {u['role']}: {u['email']}")
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # Startup: create tables in PostgreSQL (Supabase), seed demo data
+def init_db():
+    """Create all tables and seed demo data. Safe to call multiple times."""
     models.Base.metadata.create_all(bind=engine)
     db = SessionLocal()
     try:
-        print("[DB] Database ready. Seeding demo accounts...")
         seed_demo_users(db)
-        print("[OK] Startup complete.")
     finally:
         db.close()
+
+
+# ─── Module-level init (Vercel serverless cold start) ─────────────────────────
+# Vercel serverless functions do not reliably fire FastAPI lifespan events.
+# Running init_db() at import time guarantees tables exist and demo users are
+# seeded on every cold start, before the first request is handled.
+try:
+    init_db()
+    print("[OK] DB initialised at module load.")
+except Exception as _exc:
+    # Log but don't crash — the route handler will surface a proper error
+    print(f"[WARN] DB init at module load failed: {_exc}")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Lifespan runs on traditional servers (uvicorn). init_db() is idempotent
+    # so calling it twice is safe.
+    init_db()
+    print("[OK] Lifespan startup complete.")
     yield
     # Shutdown: SQLAlchemy connection pool is cleaned up automatically
 

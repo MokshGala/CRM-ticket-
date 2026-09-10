@@ -52,12 +52,7 @@ export async function register(name, email, password) {
   });
 }
 
-export async function googleLogin(idToken) {
-  return request("/api/auth/google", {
-    method: "POST",
-    body: JSON.stringify({ id_token: idToken }),
-  });
-}
+
 
 export async function getMe() {
   return request("/api/auth/me");

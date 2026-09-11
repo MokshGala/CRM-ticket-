@@ -17,15 +17,13 @@ if DATABASE_URL:
 
     engine = create_engine(
         DATABASE_URL,
-        # pool_pre_ping: validates connections before use — critical for serverless
-        # where connections may have gone stale between function invocations.
         pool_pre_ping=True,
-        # pool_recycle: recycle connections every 5 minutes to avoid timeout errors
-        # from Supabase's connection limits.
         pool_recycle=300,
-        # Keep pool size small for Railway's connection limits
         pool_size=5,
         max_overflow=10,
+        # Railway PostgreSQL requires SSL. Supabase URLs already include SSL params.
+        # Adding sslmode=prefer as a safe default works for both.
+        connect_args={"sslmode": "require"} if DATABASE_URL.startswith("postgresql") else {},
     )
     SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 else:

@@ -6,13 +6,15 @@ from dotenv import load_dotenv
 # Load .env file if present (local dev). On Railway/Vercel, env vars are set via the dashboard.
 load_dotenv()
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.database import engine, SessionLocal
 from app import models
 from app.crud import get_user_by_email, create_user
 from app.routes import auth, tickets
+import traceback
 
 
 # ─── DB Init + Seeding ────────────────────────────────────────────────────────
@@ -113,6 +115,18 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ─── Global Exception Handler ────────────────────────────────────────────────
+# Catches any unhandled Python exception and returns it as JSON (not plain text).
+# This makes debugging 500 errors possible from the browser/API client.
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    tb = traceback.format_exc()
+    print(f"[ERROR] Unhandled exception on {request.method} {request.url}:\n{tb}")
+    return JSONResponse(
+        status_code=500,
+        content={"detail": str(exc), "type": type(exc).__name__},
+    )
 
 # Include routers
 app.include_router(auth.router)

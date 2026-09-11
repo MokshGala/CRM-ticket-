@@ -1,20 +1,8 @@
 from datetime import datetime, timezone
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Enum
+from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
-import enum
 
 from app.database import Base
-
-
-class UserRole(str, enum.Enum):
-    user = "user"
-    admin = "admin"
-
-
-class TicketStatus(str, enum.Enum):
-    open = "Open"
-    in_progress = "In Progress"
-    closed = "Closed"
 
 
 class User(Base):
@@ -24,7 +12,8 @@ class User(Base):
     name = Column(String(100), nullable=False)
     email = Column(String(255), unique=True, index=True, nullable=False)
     hashed_password = Column(String(255), nullable=True)  # NULL for OAuth-only users
-    role = Column(Enum(UserRole), default=UserRole.user, nullable=False)
+    # Use plain String instead of PostgreSQL native Enum to avoid type conflicts
+    role = Column(String(20), default="user", nullable=False)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     # Relationship: one user → many tickets

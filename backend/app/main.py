@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
 
-# Load .env file if present (local dev). On Vercel, env vars are set via the dashboard.
+# Load .env file if present (local dev). On Railway/Vercel, env vars are set via the dashboard.
 load_dotenv()
 
 from fastapi import FastAPI
@@ -18,19 +18,37 @@ from app.routes import auth, tickets
 # ─── DB Init + Seeding ────────────────────────────────────────────────────────
 
 def seed_demo_users(db):
-    """Create demo users on first run if they don't exist."""
+    """Create demo users on first run if they don't exist.
+    
+    Credentials can be overridden via environment variables for production.
+    """
     demo_users = [
-        {"name": "Demo User",  "email": "user@demo.com",  "password": "user123",  "role": "user"},
-        {"name": "Admin User", "email": "admin@demo.com", "password": "admin123", "role": "admin"},
+        {
+            "name": os.getenv("DEMO_USER_NAME", "Demo User"),
+            "email": os.getenv("DEMO_USER_EMAIL", "user@demo.com"),
+            "password": os.getenv("DEMO_USER_PASSWORD", "user123"),
+            "role": "user",
+        },
+        {
+            "name": os.getenv("DEMO_ADMIN_NAME", "Admin User"),
+            "email": os.getenv("DEMO_ADMIN_EMAIL", "admin@demo.com"),
+            "password": os.getenv("DEMO_ADMIN_PASSWORD", "admin123"),
+            "role": "admin",
+        },
     ]
     for u in demo_users:
         if not get_user_by_email(db, u["email"]):
             create_user(db, name=u["name"], email=u["email"], password=u["password"], role=u["role"])
             print(f"  [OK] Seeded {u['role']}: {u['email']}")
+        else:
+            print(f"  [SKIP] Already exists: {u['email']}")
 
 
 def init_db():
     """Create all tables and seed demo data. Safe to call multiple times."""
+    if engine is None:
+        print("[WARN] DATABASE_URL not set — skipping DB init.")
+        return
     models.Base.metadata.create_all(bind=engine)
     db = SessionLocal()
     try:
@@ -39,8 +57,7 @@ def init_db():
         db.close()
 
 
-# ─── Module-level init (Vercel serverless cold start) ─────────────────────────
-# Vercel serverless functions do not reliably fire FastAPI lifespan events.
+# ─── Module-level init ────────────────────────────────────────────────────────
 # Running init_db() at import time guarantees tables exist and demo users are
 # seeded on every cold start, before the first request is handled.
 try:
@@ -54,8 +71,7 @@ except Exception as _exc:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Lifespan runs on traditional servers (uvicorn). init_db() is idempotent
-    # so calling it twice is safe. Wrapped in try/except so a DB error here
-    # does not crash the ASGI app and block all requests.
+    # so calling it twice is safe.
     try:
         init_db()
         print("[OK] Lifespan startup complete.")
@@ -74,14 +90,21 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS — allow the Vite dev server + production origin from env
+# ─── CORS ─────────────────────────────────────────────────────────────────────
+# Allow Vite dev server, and any production frontend URLs from env vars.
+# FRONTEND_ORIGIN can be a comma-separated list of origins.
 _cors_origins = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
+    "http://localhost:3000",
 ]
-_extra_origin = os.getenv("FRONTEND_ORIGIN", "")
-if _extra_origin:
-    _cors_origins.append(_extra_origin)
+
+_extra_origins_raw = os.getenv("FRONTEND_ORIGIN", "")
+if _extra_origins_raw:
+    for _origin in _extra_origins_raw.split(","):
+        _origin = _origin.strip()
+        if _origin and _origin not in _cors_origins:
+            _cors_origins.append(_origin)
 
 app.add_middleware(
     CORSMiddleware,
@@ -98,4 +121,14 @@ app.include_router(tickets.router)
 
 @app.get("/", tags=["health"])
 def health_check():
-    return {"status": "ok", "message": "CRM Ticket System API is running."}
+    return {
+        "status": "ok",
+        "message": "CRM Ticket System API is running.",
+        "db_configured": engine is not None,
+    }
+
+
+@app.get("/health", tags=["health"])
+def health():
+    """Railway health check endpoint."""
+    return {"status": "healthy"}
